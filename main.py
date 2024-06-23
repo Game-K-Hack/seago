@@ -89,9 +89,7 @@ def save():
                 for c in environments_change[e][n][p].keys():
                     d = environments_change[e][n][p][c]["value"]
                     for key in d.keys():
-                        venv = environments[e][n][p]
-                        venv = venv["Value"][venv["SecretList"].index(c)]
-                        if d[key] != venv[key]:
+                        if d[key] != environments[e][n][p]["SealedSecret"][c][key]:
                             data.append(f"{e}__SEP__{n}__SEP__{p}__SEP__{c}__SEP__{key}: {str2b64(d[key])}")
     # Chiffrer
     open(cache.get("temp_folder") + "\\seago.tmp", "w", encoding="utf8").write(f"apiVersion: v1\nkind: Secret\nmetadata:\n  name: seago\ndata:\n  {'\n  '.join(data)}")
@@ -104,19 +102,15 @@ def save():
     for key in data["spec"]["encryptedData"].keys():
         e, n, p, c, k = key.split("__SEP__")
         environments_change[e][n][p][c]["value"][k] = data["spec"]["encryptedData"][key]
-        
-    old_environments = environments
-    
     # Modifier les fichiers
     for e in environments_change.keys():
         for n in environments_change[e].keys():
             for p in environments_change[e][n].keys():
                 for c in environments_change[e][n][p].keys():
-                    print(environments_change[e][n][p][c]["value"])
-                    environments[e][n][p]["SealedSecret"][environments[e][n][p]["SecretList"].index(c)]["spec"]["encryptedData"] = {} #environments_change[e][n][p][c]["value"]
-    print(environments["fr-metier-hors-production"]["fr-int-api"]["rocknbox-metier"]["Value"][0]["AZURE_CLIENT_ID"])
-    print(environments_change["fr-metier-hors-production"]["fr-int-api"]["rocknbox-metier"]["rocknbox-metier"]['value']["AZURE_CLIENT_ID"])
-    print(old_environments == environments)
+                    environments[e][n][p]["SealedSecret"][c] = environments_change[e][n][p][c]["value"]
+                    environments[e][n][p]["Data"][list(environments[e][n][p]["SealedSecret"].keys()).index(c)]["spec"]["encryptedData"] = environments_change[e][n][p][c]["value"]
+                data = [yaml.safe_dump(d, sort_keys=False) for d in environments[e][n][p]["Data"]]
+                open(environments[e][n][p]["Path"], "w", encoding="utf8").write("\n---\n".join(data))
     # Pull
     # TODO
 
@@ -146,19 +140,19 @@ def callback(env, namespace, event):
 
         tk.Label(frame, text=data["Group"], font=(15)).grid(row=1, column=3, columnspan=2, sticky=tk.NE)
 
-        state = "disabled" if len(data["SecretList"]) < 2 else "readonly"
+        state = "disabled" if len(list(data["SealedSecret"].keys())) < 2 else "readonly"
 
         config_text = tk.StringVar()
         config = Combobox(frame, textvariable=config_text, width=60, state=state)
-        config["values"] = data["SecretList"]
-        config_text.set(data["SecretList"][0])
+        config["values"] = list(data["SealedSecret"].keys())
+        config_text.set(list(data["SealedSecret"].keys())[0])
         config.grid(row=1, column=1, columnspan=3, sticky=tk.W)
         # config.bind("<<ComboboxSelected>>", month_changed)
 
         tk.Canvas(frame, width=10, height=10).grid(row=2, column=0)
 
-        for conf in data["SealedSecret"]:
-            secret_values = conf["spec"]["encryptedData"]
+        for conf in data["SealedSecret"].keys():
+            secret_values = data["SealedSecret"][conf]
 
             secret_entry = []
             start_pos = 3

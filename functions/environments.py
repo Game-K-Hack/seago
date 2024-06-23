@@ -33,14 +33,11 @@ def get_environments() -> dict:
                                     if is_yaml_file(current_filename_path):
                                         data = [i for i in yaml.load_all(open(current_filename_path), Loader=yaml.FullLoader)]
                                         if len(data) > 0 and "kind" in data[0].keys() and data[0]["kind"] == "SealedSecret":
-                                            groups[group][envpath][namespace][project]["SealedSecret"] = data
                                             groups[group][envpath][namespace][project]["Path"] = current_filename_path
                                             groups[group][envpath][namespace][project]["Group"] = group
-                                            groups[group][envpath][namespace][project]["SecretList"] = [
-                                                conf["metadata"]["name"]
-                                                    if "metadata" in conf and 
-                                                    "name" in conf["metadata"]
-                                                    else (
+                                            groups[group][envpath][namespace][project]["SealedSecret"] = {
+                                                (conf["metadata"]["name"]
+                                                    if "metadata" in conf and "name" in conf["metadata"] else (
                                                         conf["spec"]["template"]["metadata"]["name"]
                                                             if "spec" in conf and 
                                                             "template" in conf["spec"] and 
@@ -48,9 +45,10 @@ def get_environments() -> dict:
                                                             "name" in conf["spec"]["template"]["metadata"] 
                                                             else ""
                                                     )
+                                                ):conf["spec"]["encryptedData"]
                                                 for conf in data
-                                            ]
-                                            groups[group][envpath][namespace][project]["Value"] = [i["spec"]["encryptedData"] for i in data]
+                                            }
+                                            groups[group][envpath][namespace][project]["Data"] = data
 
     environments = {}
 
